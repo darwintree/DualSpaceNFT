@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 // firstly core side contract
 // then deploy espace contract with core side contract mapping address (bind from espace->core)
 // finally bind from core (bind from core->espace)
-contract DuelSpaceNFTEvm is ERC721 {
+contract DualSpaceNFTEvm is ERC721 {
 
     address coreContractMappingAddress;
     // the token should be able to move directly at espace only if the core space owner is not set

@@ -11,7 +11,7 @@ import "../interfaces/ICrossSpaceCall.sol";
 // firstly core side contract
 // then deploy espace contract with core side contract mapping address (bind from espace->core)
 // finally bind from core (bind from core->espace)
-contract DuelSpaceNFTCore is ERC721, Ownable {
+contract DualSpaceNFTCore is ERC721, Ownable {
     bytes20 evmContractAddress;
     address admin;
     CrossSpaceCall crossSpaceCall;
