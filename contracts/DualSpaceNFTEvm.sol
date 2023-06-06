@@ -4,71 +4,58 @@ pragma solidity ^0.8.0;
 
 // import "@openzepplin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-
+import "./DualSpaceGeneral.sol";
 
 // deployment
 // firstly core side contract
 // then deploy espace contract with core side contract mapping address (bind from espace->core)
 // finally bind from core (bind from core->espace)
-contract DualSpaceNFTEvm is ERC721 {
+contract DualSpaceNFTEvm is DualSpaceGeneral {
 
     address _coreContractMappingAddress;
     // the token should be able to move directly at espace only if the core space owner is not set
     // or after 
     mapping(uint256=>bool) _evmTransferable;
 
-
-    struct TokenMeta {
-        uint32 tokenBatch; // 20230401
-        uint8 rarity;      // < 10
-        uint16 batchInternalId; // < 999
-    }
     struct ExpirationSetting {
-        uint startTimestamp;
+        uint startBlock;
         uint8 ratio;
     }
-    // token batch setting is placed at espace for dual space visit
-    mapping (uint32=>ExpirationSetting) _batchExpirationSetting;
-    uint _baseExpirationInternal;
 
-    
+    // token batch setting is placed at espace for dual space visit
+    mapping (uint128=>ExpirationSetting) _batchExpirationSetting;
+    uint _baseExpirationBlockInterval;
 
     // name_ and symbol_ should be same as core side
     constructor(string memory name_, string memory symbol_, address _coreContractMappingAddress_) ERC721(name_, symbol_) {
         _coreContractMappingAddress = _coreContractMappingAddress_;
-        _baseExpirationInternal = 30 days;
+        _baseExpirationBlockInterval = 30 days * 2; // 2 block per second
     }
 
     modifier fromCore() {
-        // require(msg.sender == _coreContractMappingAddress, "only core contract could manipulate this function");
+        require(msg.sender == _coreContractMappingAddress, "only core contract could manipulate this function");
         _;
     }
 
     function mint(bytes20 ownerEvmAddress, uint256 tokenId) public fromCore {
-        uint32 batchNbr = _resolveTokenId(tokenId).tokenBatch;
-        require(_batchExpirationSetting[batchNbr].startTimestamp != 0, "batch is not start");
+        // uint128 batchNbr = _resolveTokenId(tokenId).batchNbr;
+        // require(_batchExpirationSetting[batchNbr].startBlock != 0, "batch is not start");
         _mint(address(ownerEvmAddress), tokenId);
     }
 
-    // token example 20230401010001
-    // token batch * 10^6 + rarity * 10^4 + batch internal id
-    function _resolveTokenId(uint256 tokenId) internal pure returns (TokenMeta memory) {
-        uint32 tokenBatch = uint32(tokenId/(10**6));
-        uint8 rarity = uint8(tokenId/(10**4) - tokenBatch);
-        uint16 batchInternalId = uint16(tokenId - tokenBatch * 10**6 - rarity * 10**4);
-        return TokenMeta(tokenBatch, rarity, batchInternalId);
-    }
-
-    function isExpired(uint256 tokenId) public view returns (bool){
+    function resolveTokenId(uint256 tokenId) public view returns (TokenMeta memory) {
+        require (_exists(tokenId), "token id does not exist");
         TokenMeta memory tokenMeta = _resolveTokenId(tokenId);
-        ExpirationSetting memory expSetting = _batchExpirationSetting[tokenMeta.tokenBatch];
-        uint exp = expSetting.startTimestamp + expSetting.ratio * tokenMeta.rarity;
-        return block.number < exp;
+        return tokenMeta;
     }
 
-    event BatchStart(uint256 startTimestamp, uint32 batchNbr, uint8 ratio);
+    function getExpiration(uint256 tokenId) public view override returns (uint256 exp){
+        TokenMeta memory tokenMeta = _resolveTokenId(tokenId);
+        ExpirationSetting memory expSetting = _batchExpirationSetting[tokenMeta.batchNbr];
+        exp = expSetting.startBlock + expSetting.ratio * tokenMeta.rarity * _baseExpirationBlockInterval;
+    }
 
-    function startBatch(uint32 batchNbr, uint8 ratio) public fromCore {
+    function startBatch(uint128 batchNbr, uint8 ratio) public fromCore {
         _batchExpirationSetting[batchNbr] = ExpirationSetting(block.number, ratio);
         emit BatchStart(block.number, batchNbr, ratio);
     }

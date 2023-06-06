@@ -6,16 +6,18 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 // import "OpenZeppelin/openzeppelin-contracts@4.9.0/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./DualSpaceGeneral.sol";
 import "../interfaces/ICrossSpaceCall.sol";
 
 // deployment
 // firstly core side contract
 // then deploy espace contract with core side contract mapping address (bind from espace->core)
 // finally bind from core (bind from core->espace)
-contract DualSpaceNFTCore is ERC721, Ownable {
+contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
     bytes20 _evmContractAddress;
     CrossSpaceCall _crossSpaceCall;
-    uint _defaultOracleLife;
+    uint _defaultOracleBlockLife;
+
     struct MintOracleSetting {
         address signer;
         uint expiration;
@@ -23,16 +25,17 @@ contract DualSpaceNFTCore is ERC721, Ownable {
 
     // 20230523 => address
     // mint oracle is a centralized server to prove the user owns the Github token
-    mapping (uint32=>MintOracleSetting) _mintOracleSignerSetting;
+    mapping (uint128=>MintOracleSetting) _mintOracleSignerSetting;
     // batchNbr => usernameHash => rarityCouldMint
-    mapping (uint32=>mapping(bytes32=>uint8)) _authorizedRarityMintPermission;
+    mapping (uint128=>mapping(bytes32=>uint8)) _authorizedRarityMintPermission;
     // avoid meta transaction replay attack
     mapping (bytes20=>uint256) _crossSpaceNonce;
-    mapping (uint32=>uint16) _batchInternalIdCounter;
+    mapping (uint128=>uint16) _batchInternalIdCounter;
 
-    constructor(string memory name_, string memory symbol_) ERC721(name_, symbol_) Ownable() {
-        _crossSpaceCall = CrossSpaceCall(0x0888000000000000000000000000000000000006);
-        _defaultOracleLife = 30 days;
+    constructor(string memory name_, string memory symbol_, address crossSpaceCallAddress) ERC721(name_, symbol_) Ownable() {
+        // _crossSpaceCall = CrossSpaceCall(0x0888000000000000000000000000000000000006);
+        _crossSpaceCall = CrossSpaceCall(crossSpaceCallAddress);
+        _defaultOracleBlockLife = 30 days * 2; // 30 days, 2 block per second
     }
 
     function setEvmContractAddress(bytes20 evmContractAddress_) public onlyOwner {
@@ -40,27 +43,26 @@ contract DualSpaceNFTCore is ERC721, Ownable {
         _evmContractAddress = evmContractAddress_;
     }
 
-    // function authorizeMintOracleSigner(uint32 batchNbr, address signer, ) public onlyOwner {
+    // function authorizeMintOracleSigner(uint128 batchNbr, address signer, ) public onlyOwner {
     //     _mintOracleSignerSetting[batchNbr].signer = signer;
-    //     _mintOracleSignerSetting[batchNbr].expiration = block.number + _defaultOracleLife;
+    //     _mintOracleSignerSetting[batchNbr].expiration = block.number + _defaultOracleBlockLife;
     // }
-    event BatchStart(uint256 startTimestamp, uint32 batchNbr, uint8 ratio);
 
-    function startBatch(uint32 batchNbr, address signer, uint8 ratio) public onlyOwner {
+    function startBatch(uint128 batchNbr, address signer, uint8 ratio) public onlyOwner {
         require(batchNbr < 99999999, "invalid batch nbr");
         _mintOracleSignerSetting[batchNbr].signer = signer;
-        _mintOracleSignerSetting[batchNbr].expiration = block.number + _defaultOracleLife;
+        _mintOracleSignerSetting[batchNbr].expiration = block.number + _defaultOracleBlockLife;
         _crossSpaceCall.callEVM(_evmContractAddress, 
-            abi.encodeWithSignature("startBatch(uint32,uint8)", batchNbr, ratio)
+            abi.encodeWithSignature("startBatch(uint128,uint8)", batchNbr, ratio)
         );
         emit BatchStart(block.number, batchNbr, ratio);
     }
 
-    function _isValidMintOracleSigner(address signer, uint32 batchNbr) internal view returns (bool) {
+    function _isValidMintOracleSigner(address signer, uint128 batchNbr) internal view returns (bool) {
         return signer == _mintOracleSignerSetting[batchNbr].signer && _mintOracleSignerSetting[batchNbr].expiration > block.number;
     }
 
-    function batchAuthorizeMintPermission(uint32 batchNbr, string[] memory usernames, uint8 rarity) public {
+    function batchAuthorizeMintPermission(uint128 batchNbr, string[] memory usernames, uint8 rarity) public {
         // owner or mint oracle
         if (msg.sender == owner()) {
             // do nothing
@@ -77,22 +79,26 @@ contract DualSpaceNFTCore is ERC721, Ownable {
         }
     }
 
-    function _authorizeMintPermission(uint32 batchNbr, string memory username, uint8 rarity) internal {
+    function _authorizeMintPermission(uint128 batchNbr, string memory username, uint8 rarity) internal {
         bytes32 usernameHash = keccak256(abi.encodePacked(username));
         _authorizedRarityMintPermission[batchNbr][usernameHash] = rarity;
     }
 
-    function _nextTokenId(uint32 batchNbr, uint8 rarity, uint16 batchInternalId) pure internal returns (uint256) {
-        return batchNbr * 10**6 + rarity ** 10**4 + batchInternalId;
-    }
+    // function _nextTokenId(uint128 batchNbr, uint8 rarity, uint16 batchInternalId) pure internal returns (uint256) {
+    //     return uint256(batchNbr) * 10**6 + uint256(rarity) * 10**4 + uint256(batchInternalId);
+    // }
 
-    function mint(uint32 batchNbr, string memory username, address ownerCoreAddress, bytes20 ownerEvmAddress, bytes memory oracleSignature) public returns (uint256) {
+    function mint(uint128 batchNbr, string memory username, address ownerCoreAddress, bytes20 ownerEvmAddress, bytes memory oracleSignature) public returns (uint256) {
         require(_mintOracleSignerSetting[batchNbr].expiration > block.number, "no available mint oracle at present");
         // TODO: verify signature is from oracle
         // signer = ecrecover
 
         bytes32 usernameHash = keccak256(abi.encodePacked(username));
         uint8 rarity = _authorizedRarityMintPermission[batchNbr][usernameHash];
+        require(rarity != 0, "no permission to mint");
+        delete _authorizedRarityMintPermission[batchNbr][usernameHash];
+
+        _batchInternalIdCounter[batchNbr] += 1;
         uint256 tokenId = _nextTokenId(batchNbr, rarity, _batchInternalIdCounter[batchNbr]);
         // if mint to zero, mint to self
         if (ownerCoreAddress == address(0)) {
@@ -111,18 +117,13 @@ contract DualSpaceNFTCore is ERC721, Ownable {
         _crossSpaceCall.callEVM(_evmContractAddress,
             abi.encodeWithSignature("mint(bytes20,uint256)", ownerEvmAddress, tokenId)
         );
-
-        // postMint
-        _batchInternalIdCounter[batchNbr] += 1;
-        delete _authorizedRarityMintPermission[batchNbr][usernameHash];
         return tokenId;
     }
 
-    // call 
-    function isExpired(uint256 tokenId) public view returns(bool){
-        return bytes1(_crossSpaceCall.staticCallEVM(_evmContractAddress, 
-            abi.encodeWithSignature("isExpired(uint256)", tokenId)
-        )) != bytes1(0x0);
+    function getExpiration(uint256 tokenId) public view override returns (uint256 exp){
+        return uint256(bytes32(_crossSpaceCall.staticCallEVM(_evmContractAddress, 
+            abi.encodeWithSignature("getExpiration(uint256)", tokenId)
+        )));
     }
 
     function _isCoreTransferable(uint256 tokenId) internal view returns (bool) {
@@ -132,13 +133,22 @@ contract DualSpaceNFTCore is ERC721, Ownable {
         return currentEvmOwner == _evmContractAddress;
     }
 
-    function clearEvmOwner(uint256 tokenId) public {
-        setEvmOwner(_evmContractAddress, tokenId);
+    modifier onlyTokenOwner(uint256 tokenId) {
+        require(msg.sender == ownerOf(tokenId), "caller is not core token owner");
+        _;
+    }
+
+    function clearEvmOwner(uint256 tokenId) public onlyTokenOwner(tokenId) {
+        _setEvmOwner(_evmContractAddress, tokenId);
     }
 
     // only core owner can set evm owner
-    function setEvmOwner(bytes20 ownerEvmAddress, uint256 tokenId) public {
-        require(msg.sender == ownerOf(tokenId), "caller is not core token owner");
+    function setEvmOwner(bytes20 ownerEvmAddress, uint256 tokenId) public onlyTokenOwner(tokenId) {
+        _setEvmOwner(ownerEvmAddress, tokenId);
+    }
+
+    function _setEvmOwner(bytes20 ownerEvmAddress, uint256 tokenId) internal {
+        
         _crossSpaceCall.callEVM(_evmContractAddress, 
             abi.encodeWithSignature("setEvmOwner(bytes20, uint256)", ownerEvmAddress, tokenId)
         );
@@ -146,6 +156,7 @@ contract DualSpaceNFTCore is ERC721, Ownable {
 
     function setCoreOwner(address ownerCoreAddress, uint256 tokenId, string memory signatureFromEvmAddress) public {
         // TODO: verify signatureFromEvmAddress is a valid signature signed by evm owner
+        // currently available for everyone
         // ...
         _transfer(ownerOf(tokenId), ownerCoreAddress, tokenId);
     }
@@ -156,7 +167,7 @@ contract DualSpaceNFTCore is ERC721, Ownable {
         super.safeTransferFrom(from, to, tokenId);
     }
 
-    function _transfer(address from, address to, uint256 tokenId) internal virtual override {
+    function _transfer(address from, address to, uint256 tokenId) internal override {
         if (from == address(this) && from != to) {
             _crossSpaceCall.callEVM(_evmContractAddress, 
                 abi.encodeWithSignature("setTransferableTable(uint256,bool)", tokenId, true)

@@ -2,6 +2,8 @@ __pycache__
 .env
 .history
 .hypothesis/
+.DS_STORE
+.vscode/
 build/
 reports/
 node_modules
