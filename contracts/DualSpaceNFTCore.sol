@@ -26,6 +26,12 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
         uint expiration;
     }
 
+    struct Signature {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+
     // 20230523 => address
     // mint oracle is a centralized server to prove the user owns the Github token
     mapping (uint128=>MintOracleSetting) _mintOracleSignerSetting;
@@ -51,6 +57,12 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
     //     _mintOracleSignerSetting[batchNbr].signer = signer;
     //     _mintOracleSignerSetting[batchNbr].expiration = block.number + _defaultOracleBlockLife;
     // }
+
+    function isOverwhelminglySameAddress(address coreAddress, bytes20 rawEvmAddress) public pure returns (bool) {
+        // core address and evm address differs for first 4 bits
+        uint160 result = (uint160(coreAddress) ^ uint160(rawEvmAddress)) & uint160(0x0fffFFFFFfFfffFfFfFFffFffFffFFfffFfFFFFf);
+        return result == 0;
+    }
 
     function startBatch(uint128 batchNbr, address signer, uint8 ratio) public onlyOwner {
         require(batchNbr < 99999999, "invalid batch nbr");
@@ -92,15 +104,27 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
     //     return uint256(batchNbr) * 10**6 + uint256(rarity) * 10**4 + uint256(batchInternalId);
     // }
 
-    function mint(uint128 batchNbr, string memory username, address ownerCoreAddress, bytes20 ownerEvmAddress, bytes memory oracleSignature) public returns (uint256) {
+    // hashToSign = keccak(batchNbr, usernameHash, ownerCoreAddress, ownerEvmAddress)
+    function mint(uint128 batchNbr, string memory username, address ownerCoreAddress, bytes20 ownerEvmAddress, Signature memory oracleSignature) public returns (uint256) {
         require(_mintOracleSignerSetting[batchNbr].expiration > block.number, "no available mint oracle at present");
-        // TODO: verify signature is from oracle
-        // signer = ecrecover
-
         bytes32 usernameHash = keccak256(abi.encodePacked(username));
+
+        // check mint permission
         uint8 rarity = _authorizedRarityMintPermission[batchNbr][usernameHash];
         require(rarity != 0, "no permission to mint");
         delete _authorizedRarityMintPermission[batchNbr][usernameHash];
+
+        require(
+            ecrecover(
+                // hash to sign. cannot be replayed, or replay will not bring benefit
+                keccak256(
+                    abi.encodePacked(batchNbr, usernameHash, ownerCoreAddress, ownerEvmAddress)
+                ),
+                oracleSignature.v, oracleSignature.r, oracleSignature.s
+            ) == _mintOracleSignerSetting[batchNbr].signer,
+            "should be signed by signer"
+        );
+
 
         _batchInternalIdCounter[batchNbr] += 1;
         uint256 tokenId = _nextTokenId(batchNbr, rarity, _batchInternalIdCounter[batchNbr]);

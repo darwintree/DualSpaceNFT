@@ -3,14 +3,22 @@ from brownie import (
     DualSpaceNFTCore, # type:ignore
     DualSpaceNFTEvm, # type:ignore
     MockMappedAddress, # type:ignore
-    accounts,
+    accounts as untyped_accounts,
     web3
 )
+
 from brownie.network.contract import Contract, ContractContainer
-from brownie.network.account import Accounts, Account
-from typing import cast, Callable
+from brownie.network.account import Account, Accounts, _PrivateKeyAccount, LocalAccount
+from typing import cast, Callable, List
 from brownie.exceptions import (
     VirtualMachineError,
+)
+
+from eth_account import (
+    Account as EthAccount,
+)
+from eth_account.datastructures import (
+    SignedMessage
 )
 
 
@@ -20,6 +28,7 @@ def should_revert(expected_revert_msg: str, f: Callable, *args, **kwargs):
     except VirtualMachineError as e:
         if expected_revert_msg:
             if expected_revert_msg not in e.message:
+                print(e)
                 raise Exception(
                     f"no expected string in exception: {expected_revert_msg}"
                 )
@@ -29,9 +38,10 @@ def should_revert(expected_revert_msg: str, f: Callable, *args, **kwargs):
 
 
 def main():
-    # accounts = cast(Accounts, accounts)
+    accounts = cast(Accounts, untyped_accounts)
     owner = accounts[0]
-    oracle_signer = accounts[1]
+    # oracle_signer = accounts[1]
+    oracle_signer = accounts.add()
     user = accounts[2]
     random_sender = accounts[3]
     evm_user = accounts[4]
@@ -63,13 +73,13 @@ def main():
 
     # print("should fail because permission is not granted")
     should_revert(
-        "",
+        "no permission to mint",
         core_contract.mint.call,
         batch_nbr,
         "hello_poap",
         user,
         evm_user.address,
-        0x00,
+        (0, "0x00", "0x00"),
         {"from": random_sender},
     )
     # core_contract.mint(
@@ -93,13 +103,13 @@ def main():
 
     # print("should fail because permission is consumed")
     should_revert(
-        "",
+        "no permission to mint",
         core_contract.mint.call,
         batch_nbr,
         "hello_poap",
         user,
         evm_user.address,
-        0x00,
+        (0, "0x00", "0x00"),
         {"from": random_sender},
     )
     # core_contract.mint(
@@ -186,12 +196,12 @@ def main():
 def mint_to(
     core_contract: Contract,
     batch_nbr: int,
-    oracle_signer: Account,
+    oracle_signer: LocalAccount,
     username: str,
     rarity: int,
-    core_owner: Account | None,
-    evm_owner: Account | None,
-    random_sender: Account,
+    core_owner: _PrivateKeyAccount | None,
+    evm_owner: _PrivateKeyAccount | None,
+    random_sender: _PrivateKeyAccount,
 ) -> int:
     core_contract.batchAuthorizeMintPermission(
         batch_nbr, [username], rarity, {"from": oracle_signer}
@@ -199,20 +209,33 @@ def mint_to(
 
     core_address = core_owner.address if core_owner else "0x0000000000000000"
     evm_address = evm_owner.address if evm_owner else "0x0000000000000000"
+    username_hash = web3.solidityKeccak(
+        ["string"], [username]
+    )
+    message_hash = web3.solidityKeccak(
+        [
+            "uint128", "bytes32", "address", "address"
+        ],
+        [
+            batch_nbr, username_hash, core_address, evm_address,
+        ]
+    )
+    signature: SignedMessage = EthAccount.signHash(message_hash, oracle_signer.private_key)
     token_id = core_contract.mint.call(
         batch_nbr,
         "hello_poap",
         core_address,
         evm_address,
-        0x00,
+        (signature.v, signature.r, signature.s,),
         {"from": random_sender},
     )
+    
     mint_tx = core_contract.mint(
         batch_nbr,
         "hello_poap",
         core_address,
         evm_address,
-        0x00,
+        (signature.v, signature.r, signature.s,),
         {"from": random_sender},
     )
     # print(mint_tx.events)
