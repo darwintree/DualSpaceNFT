@@ -60,8 +60,11 @@ contract DualSpaceNFTEvm is DualSpaceGeneral {
         emit BatchStart(block.number, batchNbr, ratio);
     }
 
-    // Indeed, this is not a "transfer" action because the owner should be one entity but with different address
-    function setEvmOwner(bytes20 ownerEvmAddress, uint256 tokenId) public fromCore {
+    // Indeed, this is not a "transfer" action
+    // because the owner in two spaces should be treated as one entity but with different address
+    // but anyhow it is treated as a special transfer as
+    // will still emit an Transfer event for log resolve and allowed transfer will be cleared
+    function setEvmOwner(uint256 tokenId, bytes20 ownerEvmAddress) public fromCore {
         // don't need to use safeTransferFrom because will not be locked
         _transfer(ownerOf(tokenId), address(ownerEvmAddress), tokenId);
     }

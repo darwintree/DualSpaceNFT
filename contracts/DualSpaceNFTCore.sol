@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 // import "OpenZeppelin/openzeppelin-contracts@4.9.0/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./DualSpaceGeneral.sol";
+import "./DualSpaceNFTEvm.sol";
 import "../interfaces/ICrossSpaceCall.sol";
 
 // deployment
@@ -15,6 +16,8 @@ import "../interfaces/ICrossSpaceCall.sol";
 // finally bind from core (bind from core->espace)
 contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
     bytes20 _evmContractAddress;
+    // only for debug
+    // DualSpaceNFTEvm evmContractForDebug;
     CrossSpaceCall _crossSpaceCall;
     uint _defaultOracleBlockLife;
 
@@ -41,6 +44,7 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
     function setEvmContractAddress(bytes20 evmContractAddress_) public onlyOwner {
         require(_evmContractAddress == bytes20(0), "setEvmContractAddress should only be invoked once");
         _evmContractAddress = evmContractAddress_;
+        // evmContractForDebug = DualSpaceNFTEvm(address(evmContractAddress_));
     }
 
     // function authorizeMintOracleSigner(uint128 batchNbr, address signer, ) public onlyOwner {
@@ -107,7 +111,6 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
         if (ownerEvmAddress == bytes20(0)) {
             ownerEvmAddress = _evmContractAddress;
         }
-        _mint(ownerCoreAddress, tokenId);
         // update transferable state
         if (ownerCoreAddress == address(this)) {
             _crossSpaceCall.callEVM(_evmContractAddress, 
@@ -117,6 +120,7 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
         _crossSpaceCall.callEVM(_evmContractAddress,
             abi.encodeWithSignature("mint(bytes20,uint256)", ownerEvmAddress, tokenId)
         );
+        _mint(ownerCoreAddress, tokenId);
         return tokenId;
     }
 
@@ -127,10 +131,15 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
     }
 
     function _isCoreTransferable(uint256 tokenId) internal view returns (bool) {
-        bytes20 currentEvmOwner = bytes20(_crossSpaceCall.staticCallEVM(_evmContractAddress, 
-            abi.encodeWithSignature("ownerOf(uint256)", tokenId)
-        ));
+        bytes20 currentEvmOwner = evmOwnerOf(tokenId);
         return currentEvmOwner == _evmContractAddress;
+    }
+
+    function evmOwnerOf(uint256 tokenId) public view returns (bytes20){
+        bytes20 currentEvmOwner = bytes20(uint160(uint256(bytes32(_crossSpaceCall.staticCallEVM(_evmContractAddress, 
+            abi.encodeWithSignature("ownerOf(uint256)", tokenId)
+        )))));
+        return currentEvmOwner;
     }
 
     modifier onlyTokenOwner(uint256 tokenId) {
@@ -139,22 +148,27 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
     }
 
     function clearEvmOwner(uint256 tokenId) public onlyTokenOwner(tokenId) {
-        _setEvmOwner(_evmContractAddress, tokenId);
+        _setEvmOwner(tokenId, _evmContractAddress);
     }
 
     // only core owner can set evm owner
-    function setEvmOwner(bytes20 ownerEvmAddress, uint256 tokenId) public onlyTokenOwner(tokenId) {
-        _setEvmOwner(ownerEvmAddress, tokenId);
+    function setEvmOwner(uint256 tokenId, bytes20 ownerEvmAddress) public onlyTokenOwner(tokenId) {
+        _setEvmOwner(tokenId, ownerEvmAddress);
     }
 
-    function _setEvmOwner(bytes20 ownerEvmAddress, uint256 tokenId) internal {
+    function _setEvmOwner(uint256 tokenId, bytes20 ownerEvmAddress) internal {
         
         _crossSpaceCall.callEVM(_evmContractAddress, 
-            abi.encodeWithSignature("setEvmOwner(bytes20, uint256)", ownerEvmAddress, tokenId)
+            abi.encodeWithSignature("setEvmOwner(uint256,bytes20)", tokenId, ownerEvmAddress)
         );
+        // evmContractForDebug.setEvmOwner(ownerEvmAddress, tokenId);
     }
 
-    function setCoreOwner(address ownerCoreAddress, uint256 tokenId, string memory signatureFromEvmAddress) public {
+    function clearCoreOwner(uint256 tokenId, string memory signatureFromEvmAddress) public {
+        setCoreOwner(tokenId, address(this), signatureFromEvmAddress);
+    }
+
+    function setCoreOwner(uint256 tokenId, address ownerCoreAddress, string memory signatureFromEvmAddress) public {
         // TODO: verify signatureFromEvmAddress is a valid signature signed by evm owner
         // currently available for everyone
         // ...
@@ -170,12 +184,12 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
     function _transfer(address from, address to, uint256 tokenId) internal override {
         if (from == address(this) && from != to) {
             _crossSpaceCall.callEVM(_evmContractAddress, 
-                abi.encodeWithSignature("setTransferableTable(uint256,bool)", tokenId, true)
+                abi.encodeWithSignature("setTransferableTable(uint256,bool)", tokenId, false)
             );
         }
         if (to == address(this)) {
             _crossSpaceCall.callEVM(_evmContractAddress, 
-                abi.encodeWithSignature("setTransferableTable(uint256,bool)", tokenId, false)
+                abi.encodeWithSignature("setTransferableTable(uint256,bool)", tokenId, true)
             );
         }
         super._transfer(from, to, tokenId);

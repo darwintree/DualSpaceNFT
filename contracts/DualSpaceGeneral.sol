@@ -29,7 +29,7 @@ abstract contract DualSpaceGeneral is ERC721 {
     }
 
     function isExpired(uint256 tokenId) public view returns (bool){
-        return block.number < getExpiration(tokenId);
+        return block.number > getExpiration(tokenId);
     }
     function getExpiration(uint256 tokenId) public virtual view returns (uint256);
 }
