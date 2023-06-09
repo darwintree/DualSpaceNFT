@@ -6,6 +6,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 // import "OpenZeppelin/openzeppelin-contracts@4.9.0/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./EvmMetatransactionVerifier.sol";
 import "./DualSpaceGeneral.sol";
 import "./DualSpaceNFTEvm.sol";
 import "../interfaces/ICrossSpaceCall.sol";
@@ -14,7 +15,7 @@ import "../interfaces/ICrossSpaceCall.sol";
 // firstly core side contract
 // then deploy espace contract with core side contract mapping address (bind from espace->core)
 // finally bind from core (bind from core->espace)
-contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
+contract DualSpaceNFTCore is DualSpaceGeneral, Ownable, EvmMetatransactionVerifier {
     bytes20 _evmContractAddress;
     // only for debug
     // DualSpaceNFTEvm evmContractForDebug;
@@ -37,11 +38,14 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
     mapping (uint128=>MintOracleSetting) _mintOracleSignerSetting;
     // batchNbr => usernameHash => rarityCouldMint
     mapping (uint128=>mapping(bytes32=>uint8)) _authorizedRarityMintPermission;
-    // avoid meta transaction replay attack
-    mapping (bytes20=>uint256) _crossSpaceNonce;
+
     mapping (uint128=>uint16) _batchInternalIdCounter;
 
-    constructor(string memory name_, string memory symbol_, address crossSpaceCallAddress) ERC721(name_, symbol_) Ownable() {
+    constructor(string memory name_, string memory symbol_, address crossSpaceCallAddress)
+        ERC721(name_, symbol_)
+        EvmMetatransactionVerifier(name_, "v1")
+        Ownable() 
+    {
         // _crossSpaceCall = CrossSpaceCall(0x0888000000000000000000000000000000000006);
         _crossSpaceCall = CrossSpaceCall(crossSpaceCallAddress);
         _defaultOracleBlockLife = 30 days * 2; // 30 days, 2 block per second
@@ -51,17 +55,6 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
         require(_evmContractAddress == bytes20(0), "setEvmContractAddress should only be invoked once");
         _evmContractAddress = evmContractAddress_;
         // evmContractForDebug = DualSpaceNFTEvm(address(evmContractAddress_));
-    }
-
-    // function authorizeMintOracleSigner(uint128 batchNbr, address signer, ) public onlyOwner {
-    //     _mintOracleSignerSetting[batchNbr].signer = signer;
-    //     _mintOracleSignerSetting[batchNbr].expiration = block.number + _defaultOracleBlockLife;
-    // }
-
-    function isOverwhelminglySameAddress(address coreAddress, bytes20 rawEvmAddress) public pure returns (bool) {
-        // core address and evm address differs for first 4 bits
-        uint160 result = (uint160(coreAddress) ^ uint160(rawEvmAddress)) & uint160(0x0fffFFFFFfFfffFfFfFFffFffFffFFfffFfFFFFf);
-        return result == 0;
     }
 
     function startBatch(uint128 batchNbr, address signer, uint8 ratio) public onlyOwner {
@@ -99,10 +92,6 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
         bytes32 usernameHash = keccak256(abi.encodePacked(username));
         _authorizedRarityMintPermission[batchNbr][usernameHash] = rarity;
     }
-
-    // function _nextTokenId(uint128 batchNbr, uint8 rarity, uint16 batchInternalId) pure internal returns (uint256) {
-    //     return uint256(batchNbr) * 10**6 + uint256(rarity) * 10**4 + uint256(batchInternalId);
-    // }
 
     // hashToSign = keccak(batchNbr, usernameHash, ownerCoreAddress, ownerEvmAddress)
     function mint(uint128 batchNbr, string memory username, address ownerCoreAddress, bytes20 ownerEvmAddress, Signature memory oracleSignature) public returns (uint256) {
@@ -188,15 +177,19 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable {
         // evmContractForDebug.setEvmOwner(ownerEvmAddress, tokenId);
     }
 
-    function clearCoreOwner(uint256 tokenId, string memory signatureFromEvmAddress) public {
-        setCoreOwner(tokenId, address(this), signatureFromEvmAddress);
+    function clearCoreOwner(bytes20 evmSigner, uint256 tokenId, bytes memory signatureFromEvmSigner) public {
+
+        setCoreOwner(evmSigner, tokenId, address(this), signatureFromEvmSigner);
     }
 
-    function setCoreOwner(uint256 tokenId, address ownerCoreAddress, string memory signatureFromEvmAddress) public {
-        // TODO: verify signatureFromEvmAddress is a valid signature signed by evm owner
+    function setCoreOwner(bytes20 evmSigner, uint256 tokenId, address newCoreOwner, bytes memory signatureFromEvmSigner) public {
+        
+        _recoverWithNonceChange(signatureFromEvmSigner, evmSigner, tokenId, newCoreOwner);
+
+        // TODO: verify evmSigner is the owner in 
         // currently available for everyone
         // ...
-        _transfer(ownerOf(tokenId), ownerCoreAddress, tokenId);
+        _transfer(ownerOf(tokenId), newCoreOwner, tokenId);
     }
 
 
