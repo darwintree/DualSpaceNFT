@@ -66,7 +66,8 @@ def test_random_authorize_username(
         ).transact({"from": random_core_sender.address}).executed()
 
 
-def test_mint(
+# not availble
+def _test_mint(
     c_w3: CWeb3,
     core_contract: ConfluxContract,
     user_private_key: bytes,

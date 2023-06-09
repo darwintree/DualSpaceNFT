@@ -14,6 +14,6 @@ from cfx_address import Base32Address
 from cfx_account import Account as CfxAccount
 from conflux_web3.contract import ConfluxContract
 
-def test_owner(c_w3: CWeb3, core_contract: ConfluxContract):
+def test_owner(c_w3: CWeb3, core_contract: ConfluxContract, evm_contract: ConfluxContract):
     owner = core_contract.functions.owner().call()
     assert(owner == c_w3.cfx.default_account)

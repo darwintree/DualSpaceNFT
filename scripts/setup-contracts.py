@@ -52,9 +52,9 @@ def main():
     name = "NAME"
     symbol = "symbol"
     batch_nbr = 20230401
-    
-    owner.transfer(evm_user, "1 ether") # type: ignore
-    owner.transfer(evm_another_address, "1 ether") # type: ignore
+
+    owner.transfer(evm_user, "1 ether")  # type: ignore
+    owner.transfer(evm_another_address, "1 ether")  # type: ignore
 
     # setup
     cross_space_call = cast(Contract, MockCrossSpaceCall.deploy({"from": owner}))
@@ -189,15 +189,24 @@ def main():
         "v1",
         core_contract,
     )
-    
-    clear_core_owner_metatransaction = metatransaction_constructor.construct_eip712_message(
+
+    clear_core_owner_metatransaction = (
+        metatransaction_constructor.construct_eip712_message(
+            evm_user.address,
+            token_id,
+            core_contract.address,  # set as evm_contract address to clear
+        )
+    )
+
+    signed_metatransaction: SignedMessage = EthAccount.sign_message(
+        clear_core_owner_metatransaction, evm_user.private_key
+    )
+    tx = core_contract.clearCoreOwner(
         evm_user.address,
         token_id,
-        core_contract.address, # set as evm_contract address to clear
+        signed_metatransaction.signature,
+        {"from": random_sender},
     )
-    
-    signed_metatransaction: SignedMessage = EthAccount.sign_message(clear_core_owner_metatransaction, evm_user.private_key)
-    tx = core_contract.clearCoreOwner(evm_user.address, token_id, signed_metatransaction.signature, {"from": random_sender})
     assert core_contract.ownerOf(token_id) == core_contract.address
     # print(tx.call_trace())
     # print("evm token can transfer:")
@@ -211,12 +220,15 @@ def main():
         evm_another_address,
         token_id,
         user,
-        EthAccount.sign_message(metatransaction_constructor.construct_eip712_message(
-            evm_another_address,
-            token_id,
-            user.address,
-        ), evm_another_account.private_key).signature,
-        {"from": random_sender}
+        EthAccount.sign_message(
+            metatransaction_constructor.construct_eip712_message(
+                evm_another_address,
+                token_id,
+                user.address,
+            ),
+            evm_another_account.private_key,
+        ).signature,
+        {"from": random_sender},
     )
     should_revert(
         "not transferable because its core space owner is set",

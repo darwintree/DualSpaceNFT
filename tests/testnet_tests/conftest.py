@@ -1,4 +1,9 @@
 from conflux_web3 import Web3 as CWeb3 # do hook
+from cfx_utils.types import ChecksumAddress
+from cfx_account import Account as CfxAccount
+from cfx_account import LocalAccount as CfxLocalAccount
+from cfx_address import Base32Address
+from conflux_web3.contract import ConfluxContract
 
 import os, pytest, json
 from typing import cast, Tuple
@@ -10,17 +15,12 @@ from web3.middleware.signing import construct_sign_and_send_raw_middleware
 from web3.contract.contract import Contract
 from web3 import Web3, HTTPProvider
 
-from cfx_utils.types import ChecksumAddress
-from cfx_account import Account as CfxAccount
-from cfx_account import LocalAccount as CfxLocalAccount
-from cfx_address import Base32Address
-from conflux_web3.contract import ConfluxContract
 
 load_dotenv()
 
 @pytest.fixture(scope="session")
 def deployed() -> bool:
-    return False
+    return bool(os.environ.get("deployed", False))
 
 @pytest.fixture(scope="session")
 def private_key() -> str:
@@ -29,9 +29,11 @@ def private_key() -> str:
 @pytest.fixture(scope="session")
 def e_w3(private_key: str) -> Web3:
     w3 = Web3(HTTPProvider("https://evmtestnet.confluxrpc.com/"))
+    acct = Account.from_key(private_key)
     w3.middleware_onion.add(
-        construct_sign_and_send_raw_middleware(Account.from_key(private_key))
+        construct_sign_and_send_raw_middleware(acct)
     )
+    w3.eth.default_account = acct.address
     return w3
 
 
@@ -48,7 +50,6 @@ def get_metadata(p: str) -> Tuple[str, str]:
         metadata = json.load(f)
         return metadata["abi"], metadata["bytecode"]
 
-
 @pytest.fixture(scope="session")
 def core_contract(deployed: bool, c_w3: CWeb3) -> ConfluxContract:
     abi, bytecode = get_metadata("build/contracts/DualSpaceNFTCore.json")
@@ -56,12 +57,12 @@ def core_contract(deployed: bool, c_w3: CWeb3) -> ConfluxContract:
         address = cast(Base32Address, os.environ["CORE_CONTRACT_ADDRESS"])
     else:
         construct_c = c_w3.cfx.contract(bytecode=bytecode, abi=abi)
-        deploy_hash = construct_c.constructor(
+        constructor = construct_c.constructor(
             os.environ["NAME"],
             os.environ["SYMBOL"],
-            # c_w3.cfx.contract(name="CrossSpaceCall").address
-            '0x0888000000000000000000000000000000000006',
-        ).transact()
+            c_w3.cfx.contract(name="CrossSpaceCall").address
+        )
+        deploy_hash = constructor.transact()
         receipt = c_w3.cfx.wait_for_transaction_receipt(deploy_hash)
         address = receipt["contractCreated"]
         if address == None:
@@ -82,7 +83,9 @@ def evm_contract(deployed: bool, e_w3: Web3, core_contract: ConfluxContract) -> 
             os.environ["NAME"],
             os.environ["SYMBOL"],
             bytes.fromhex(mappingAddress[2:])
-        ).transact()
+        ).transact({
+            "gasPrice": 20 * 10**9
+        })
         receipt = e_w3.eth.wait_for_transaction_receipt(deploy_hash)
         address = receipt["contractAddress"]
         if address == None:
@@ -100,7 +103,7 @@ class BatchSetting:
 
 @pytest.fixture(scope="session")
 def batch_setting(
-    c_w3: CWeb3, core_contract: ConfluxContract, cw3_accounts: Tuple[CfxLocalAccount, CfxLocalAccount, CfxLocalAccount]
+    c_w3: CWeb3, core_contract: ConfluxContract, evm_contract: ConfluxContract, cw3_accounts: Tuple[CfxLocalAccount, CfxLocalAccount, CfxLocalAccount]
 ) -> BatchSetting:
     raw = int(os.environ["BATCH_NBR"])
     signer = cw3_accounts[1]
