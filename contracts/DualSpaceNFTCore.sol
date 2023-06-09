@@ -185,10 +185,7 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable, EvmMetatransactionVerifi
     function setCoreOwner(bytes20 evmSigner, uint256 tokenId, address newCoreOwner, bytes memory signatureFromEvmSigner) public {
         
         _recoverWithNonceChange(signatureFromEvmSigner, evmSigner, tokenId, newCoreOwner);
-
-        // TODO: verify evmSigner is the owner in 
-        // currently available for everyone
-        // ...
+        require(evmSigner == evmOwnerOf(tokenId), "do not have permission to set core owner");
         _transfer(ownerOf(tokenId), newCoreOwner, tokenId);
     }
 
