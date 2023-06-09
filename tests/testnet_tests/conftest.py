@@ -5,7 +5,7 @@ from cfx_account import LocalAccount as CfxLocalAccount
 from cfx_address import Base32Address
 from conflux_web3.contract import ConfluxContract
 
-import os, pytest, json
+import os, pytest, json, random
 from typing import cast, Tuple
 from dataclasses import dataclass
 from dotenv import load_dotenv
@@ -105,12 +105,12 @@ class BatchSetting:
 def batch_setting(
     c_w3: CWeb3, core_contract: ConfluxContract, evm_contract: ConfluxContract, cw3_accounts: Tuple[CfxLocalAccount, CfxLocalAccount, CfxLocalAccount]
 ) -> BatchSetting:
-    raw = int(os.environ["BATCH_NBR"])
+    batch_nbr = random.randint(20000000, 21000000)
     signer = cw3_accounts[1]
     core_contract.functions.startBatch(
-        raw, signer.address, 1
+        batch_nbr, signer.address, 1
     ).transact().executed()
-    return BatchSetting(raw, signer)
+    return BatchSetting(batch_nbr, signer)
 
 
 @pytest.fixture(scope="session")
