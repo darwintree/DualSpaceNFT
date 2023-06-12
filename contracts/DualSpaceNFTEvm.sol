@@ -78,7 +78,9 @@ contract DualSpaceNFTEvm is DualSpaceGeneral {
     }
 
     function safeTransferFrom(address from, address to, uint256 tokenId) public override {
-        require(_isEvmTransferable(tokenId), "This token is not transferable because its core space owner is set. Clear core space owner and try again");
+        if (to != address(this)) {
+            require(_isEvmTransferable(tokenId), "This token is not transferable because its core space owner is set. Clear core space owner and try again");
+        }
         super.safeTransferFrom(from, to, tokenId);
     }
 }

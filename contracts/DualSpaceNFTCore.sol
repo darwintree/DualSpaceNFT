@@ -191,7 +191,9 @@ contract DualSpaceNFTCore is DualSpaceGeneral, Ownable, EvmMetatransactionVerifi
 
 
     function safeTransferFrom(address from, address to, uint256 tokenId) public override {
-        require(_isCoreTransferable(tokenId), "This token is not transferable because its evm space owner is set. Clear evm space owner and try again");
+        if (to != address(this)) {
+            require(_isCoreTransferable(tokenId), "This token is not transferable because its evm space owner is set. Clear evm space owner and try again");   
+        }
         super.safeTransferFrom(from, to, tokenId);
     }
 
