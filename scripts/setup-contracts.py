@@ -52,6 +52,7 @@ def main():
     name = "NAME"
     symbol = "symbol"
     batch_nbr = 20230401
+    espace_chain_id = web3.eth.chain_id
 
     owner.transfer(evm_user, "1 ether")  # type: ignore
     owner.transfer(evm_another_address, "1 ether")  # type: ignore
@@ -61,7 +62,7 @@ def main():
     core_contract = cast(
         Contract,
         DualSpaceNFTCore.deploy(
-            name, symbol, cross_space_call.address, {"from": owner}
+            name, symbol, cross_space_call.address, espace_chain_id, {"from": owner}
         ),
     )
     mapped_address = cast(
@@ -121,9 +122,9 @@ def main():
     #     batch_nbr, "hello_poap", user, evm_user.address, 0x00, {"from": random_sender}
     # )
 
-    # print(evm_contract.getExpiration(20230401010001).traceback())
-    print(evm_contract.getExpiration(token_id))
-    assert core_contract.isExpired(token_id) == False
+    # print(evm_contract.getPrivilegeExpiration(20230401010001).traceback())
+    print(evm_contract.getPrivilegeExpiration(token_id))
+    assert core_contract.isPrivilegeExpired(token_id) == False
 
     # test safeTransferFrom is banned until another side owner is reset
     should_revert(
@@ -237,6 +238,41 @@ def main():
         evm_user,
         token_id,
     )
+    
+    mint_to(
+        core_contract,
+        batch_nbr,
+        oracle_signer,
+        "hello_poap",
+        1,
+        user,
+        None,
+        random_sender,
+    )
+    
+    mint_to(
+        core_contract,
+        batch_nbr,
+        oracle_signer,
+        "hello_poap",
+        1,
+        None,
+        evm_user,
+        random_sender,
+    )
+    
+    should_revert(
+        "cannot clear both space owner when minting",
+        mint_to,
+        core_contract,
+        batch_nbr,
+        oracle_signer,
+        "hello_poap",
+        1,
+        None,
+        None,
+        random_sender,
+    )
 
 
 class MetatransactionConstructor:
@@ -292,11 +328,11 @@ def mint_to(
     random_sender: _PrivateKeyAccount,
 ) -> int:
     core_contract.batchAuthorizeMintPermission(
-        batch_nbr, [username], rarity, {"from": oracle_signer}
+        batch_nbr, [username], [rarity], {"from": oracle_signer}
     )
 
-    core_address = core_owner.address if core_owner else "0x0000000000000000"
-    evm_address = evm_owner.address if evm_owner else "0x0000000000000000"
+    core_address = core_owner.address if core_owner else "0x0000000000000000000000000000000000000000"
+    evm_address = evm_owner.address if evm_owner else "0x0000000000000000000000000000000000000000"
     username_hash = web3.solidityKeccak(["string"], [username])
     message_hash = web3.solidityKeccak(
         ["uint128", "bytes32", "address", "address"],

@@ -51,7 +51,7 @@ def get_metadata(p: str) -> Tuple[str, str]:
         return metadata["abi"], metadata["bytecode"]
 
 @pytest.fixture(scope="session")
-def core_contract(deployed: bool, c_w3: CWeb3) -> ConfluxContract:
+def core_contract(deployed: bool, c_w3: CWeb3, e_w3: Web3) -> ConfluxContract:
     abi, bytecode = get_metadata("build/contracts/DualSpaceNFTCore.json")
     if deployed:
         address = cast(Base32Address, os.environ["CORE_CONTRACT_ADDRESS"])
@@ -60,7 +60,8 @@ def core_contract(deployed: bool, c_w3: CWeb3) -> ConfluxContract:
         constructor = construct_c.constructor(
             os.environ["NAME"],
             os.environ["SYMBOL"],
-            c_w3.cfx.contract(name="CrossSpaceCall").address
+            c_w3.cfx.contract(name="CrossSpaceCall").address,
+            e_w3.eth.chain_id
         )
         deploy_hash = constructor.transact()
         receipt = c_w3.cfx.wait_for_transaction_receipt(deploy_hash)
@@ -135,7 +136,10 @@ def cw3_accounts(c_w3: CWeb3) -> Tuple[CfxLocalAccount, CfxLocalAccount, CfxLoca
         "from": random_account.address
     }).executed()
     return user_account, oracle_signer, random_account
-    
+
+@pytest.fixture(scope="session")
+def oracle_signer(cw3_accounts: Tuple[CfxLocalAccount, CfxLocalAccount, CfxLocalAccount]) -> CfxLocalAccount:
+    return cw3_accounts[1]
 
 @pytest.fixture(scope="session")
 def user_private_key(cw3_accounts: Tuple[CfxLocalAccount, CfxLocalAccount, CfxLocalAccount]) -> bytes:
