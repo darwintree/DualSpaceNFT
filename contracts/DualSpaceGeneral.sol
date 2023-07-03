@@ -28,13 +28,12 @@ abstract contract DualSpaceGeneral is ERC721 {
         return uint256(batchNbr) * 10**6 + uint256(rarity) * 10**4 + uint256(batchInternalId);
     }
 
-    // TODO: rename to isPrivilegeExpired
-    function isExpired(uint256 tokenId) public view returns (bool){
-        return block.number > getExpiration(tokenId);
+    function isPrivilegeExpired(uint256 tokenId) public view returns (bool){
+        return block.number > getPrivilegeExpiration(tokenId);
     }
 
     // should add?
     // function lock(uint256 tokenId, uint256 period) public 
 
-    function getExpiration(uint256 tokenId) public virtual view returns (uint256);
+    function getPrivilegeExpiration(uint256 tokenId) public virtual view returns (uint256);
 }

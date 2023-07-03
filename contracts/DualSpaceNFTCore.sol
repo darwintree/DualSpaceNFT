@@ -48,8 +48,9 @@ contract DualSpaceNFTCore is
     constructor(
         string memory name_,
         string memory symbol_,
-        address crossSpaceCallAddress
-    ) ERC721(name_, symbol_) EvmMetatransactionVerifier(name_, "v1") Ownable() {
+        address crossSpaceCallAddress,
+        uint256 eSpaceChainId
+    ) ERC721(name_, symbol_) EvmMetatransactionVerifier(name_, "v1", eSpaceChainId) Ownable() {
         // _crossSpaceCall = CrossSpaceCall(0x0888000000000000000000000000000000000006);
         _crossSpaceCall = CrossSpaceCall(crossSpaceCallAddress);
         _defaultOracleBlockLife = 30 days * 2; // 30 days, 2 block per second
@@ -96,12 +97,12 @@ contract DualSpaceNFTCore is
             _mintOracleSignerSetting[batchNbr].expiration > block.number;
     }
 
-    // TODO: uint8 rarity to uint8[] rarities
     function batchAuthorizeMintPermission(
         uint128 batchNbr,
         string[] memory usernames,
-        uint8 rarity
+        uint8[] memory rarities
     ) public {
+        require(usernames.length == rarities.length, "username and rariry array must have same length");
         // owner or mint oracle
         if (msg.sender == owner()) {
             // do nothing
@@ -111,7 +112,7 @@ contract DualSpaceNFTCore is
             revert("msg sender is not authorized to set mint permission");
         }
         for (uint256 i = 0; i < usernames.length; i++) {
-            _authorizeMintPermission(batchNbr, usernames[i], rarity);
+            _authorizeMintPermission(batchNbr, usernames[i], rarities[i]);
         }
     }
 
@@ -124,6 +125,7 @@ contract DualSpaceNFTCore is
         _authorizedRarityMintPermission[batchNbr][usernameHash] = rarity;
     }
 
+    // TODO: prevent minting if dual space owner are all set to contract
     // hashToSign = keccak(batchNbr, usernameHash, ownerCoreAddress, ownerEvmAddress)
     function mint(
         uint128 batchNbr,
@@ -174,6 +176,9 @@ contract DualSpaceNFTCore is
         if (ownerEvmAddress == bytes20(0)) {
             ownerEvmAddress = _evmContractAddress;
         }
+        if (ownerCoreAddress == address(this) && ownerEvmAddress == _evmContractAddress) {
+            revert("cannot clear both space owner when minting");
+        }
         // update transferable state
         if (ownerCoreAddress == address(this)) {
             _crossSpaceCall.callEVM(
@@ -197,7 +202,7 @@ contract DualSpaceNFTCore is
         return tokenId;
     }
 
-    function getExpiration(
+    function getPrivilegeExpiration(
         uint256 tokenId
     ) public view override returns (uint256 exp) {
         return
@@ -206,7 +211,7 @@ contract DualSpaceNFTCore is
                     _crossSpaceCall.staticCallEVM(
                         _evmContractAddress,
                         abi.encodeWithSignature(
-                            "getExpiration(uint256)",
+                            "getPrivilegeExpiration(uint256)",
                             tokenId
                         )
                     )

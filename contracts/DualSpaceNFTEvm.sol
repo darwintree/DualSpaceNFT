@@ -57,7 +57,7 @@ contract DualSpaceNFTEvm is DualSpaceGeneral {
         return tokenMeta;
     }
 
-    function getExpiration(
+    function getPrivilegeExpiration(
         uint256 tokenId
     ) public view override returns (uint256 exp) {
         TokenMeta memory tokenMeta = _resolveTokenId(tokenId);

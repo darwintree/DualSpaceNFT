@@ -9,7 +9,7 @@ abstract contract EvmMetatransactionVerifier is EIP712 {
     // avoid meta transaction replay attack
     mapping (bytes20=>uint256) _metaTransactionNonces;
 
-    constructor(string memory name, string memory version) EIP712(name, version) {
+    constructor(string memory name, string memory version, uint256 eSpaceChainId) EIP712(name, version, eSpaceChainId) {
 
     }
 
