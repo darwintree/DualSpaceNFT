@@ -9,7 +9,7 @@ from brownie import (
 
 from brownie.network.contract import Contract, ContractContainer
 from brownie.network.account import Account, Accounts, _PrivateKeyAccount, LocalAccount
-from typing import cast, Callable, List, Mapping
+from typing import cast, Callable, List, Mapping, Union
 from brownie.exceptions import (
     VirtualMachineError,
 )
@@ -323,8 +323,8 @@ def mint_to(
     oracle_signer: LocalAccount,
     username: str,
     rarity: int,
-    core_owner: _PrivateKeyAccount | None,
-    evm_owner: _PrivateKeyAccount | None,
+    core_owner: Union[_PrivateKeyAccount, None],
+    evm_owner: Union[_PrivateKeyAccount, None],
     random_sender: _PrivateKeyAccount,
 ) -> int:
     core_contract.batchAuthorizeMintPermission(
