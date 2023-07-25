@@ -26,8 +26,9 @@ contract DualSpaceNFTCore is
     CrossSpaceCall _crossSpaceCall;
     uint _defaultOracleBlockLife;
 
-    struct MintOracleSetting {
-        address signer;
+    struct MintSetting {
+        address oracleSigner;
+        address authorizer;
         uint expiration;
     }
 
@@ -39,7 +40,7 @@ contract DualSpaceNFTCore is
 
     // 20230523 => address
     // mint oracle is a centralized server to prove the user owns the Github token
-    mapping(uint128 => MintOracleSetting) _mintOracleSignerSetting;
+    mapping(uint128 => MintSetting) _mintSetting;
     // batchNbr => usernameHash => rarityCouldMint
     mapping(uint128 => mapping(bytes32 => uint8)) _authorizedRarityMintPermission;
 
@@ -49,11 +50,12 @@ contract DualSpaceNFTCore is
         string memory name_,
         string memory symbol_,
         address crossSpaceCallAddress,
-        uint256 eSpaceChainId
+        uint256 eSpaceChainId,
+        uint256 defaultOracleLife
     ) ERC721(name_, symbol_) EvmMetatransactionVerifier(name_, "v1", eSpaceChainId) Ownable() {
         // _crossSpaceCall = CrossSpaceCall(0x0888000000000000000000000000000000000006);
         _crossSpaceCall = CrossSpaceCall(crossSpaceCallAddress);
-        _defaultOracleBlockLife = 30 days * 2; // 30 days, 2 block per second
+        _defaultOracleBlockLife = defaultOracleLife; // expected to defaults to 30 days, 2 block per second (30 * 24 * 60 * 60 * 2)
     }
 
     function setEvmContractAddress(
@@ -69,12 +71,14 @@ contract DualSpaceNFTCore is
 
     function startBatch(
         uint128 batchNbr,
-        address signer,
+        address oracleSigner,
+        address authorizer,
         uint8 ratio
     ) public onlyOwner {
         require(batchNbr < 99999999, "invalid batch nbr");
-        _mintOracleSignerSetting[batchNbr].signer = signer;
-        _mintOracleSignerSetting[batchNbr].expiration =
+        _mintSetting[batchNbr].oracleSigner = oracleSigner;
+        _mintSetting[batchNbr].authorizer = authorizer;
+        _mintSetting[batchNbr].expiration =
             block.number +
             _defaultOracleBlockLife;
         _crossSpaceCall.callEVM(
@@ -89,12 +93,30 @@ contract DualSpaceNFTCore is
     }
 
     function _isValidMintOracleSigner(
-        address signer,
+        address oracleSigner,
         uint128 batchNbr
     ) internal view returns (bool) {
         return
-            signer == _mintOracleSignerSetting[batchNbr].signer &&
-            _mintOracleSignerSetting[batchNbr].expiration > block.number;
+            oracleSigner == _mintSetting[batchNbr].oracleSigner &&
+            _mintSetting[batchNbr].expiration > block.number;
+    }
+
+    function _isValidMintOracleAuthorizer(
+        address authorizer,
+        uint128 batchNbr
+    ) internal view returns (bool) {
+        return
+            authorizer == _mintSetting[batchNbr].authorizer &&
+            _mintSetting[batchNbr].expiration > block.number;
+    }
+
+    function clearMintSetting(uint128 batchNbr) public {
+        require((_mintSetting[batchNbr].expiration + _defaultOracleBlockLife) < block.number, "mint setting not expired for enough time");
+        delete _mintSetting[batchNbr];
+    }
+
+    function getMintSettingExpiration(uint128 batchNbr) public view returns (uint256) {
+        return _mintSetting[batchNbr].expiration;
     }
 
     function batchAuthorizeMintPermission(
@@ -106,7 +128,7 @@ contract DualSpaceNFTCore is
         // owner or mint oracle
         if (msg.sender == owner()) {
             // do nothing
-        } else if (_isValidMintOracleSigner(msg.sender, batchNbr)) {
+        } else if (_isValidMintOracleAuthorizer(msg.sender, batchNbr)) {
             // do nothing
         } else {
             revert("msg sender is not authorized to set mint permission");
@@ -135,7 +157,7 @@ contract DualSpaceNFTCore is
         Signature memory oracleSignature
     ) public returns (uint256) {
         require(
-            _mintOracleSignerSetting[batchNbr].expiration > block.number,
+            _mintSetting[batchNbr].expiration > block.number,
             "no available mint oracle at present"
         );
         bytes32 usernameHash = keccak256(abi.encodePacked(username));
@@ -159,8 +181,8 @@ contract DualSpaceNFTCore is
                 oracleSignature.v,
                 oracleSignature.r,
                 oracleSignature.s
-            ) == _mintOracleSignerSetting[batchNbr].signer,
-            "should be signed by signer"
+            ) == _mintSetting[batchNbr].oracleSigner,
+            "should be signed by oracle signer"
         );
 
         _batchInternalIdCounter[batchNbr] += 1;

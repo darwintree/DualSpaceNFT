@@ -5,6 +5,7 @@ from brownie import (
     MockMappedAddress,  # type:ignore
     accounts as untyped_accounts,
     web3,
+    chain,
 )
 
 from brownie.network.contract import Contract, ContractContainer
@@ -49,10 +50,12 @@ def main():
     core_another_address = accounts[5].address
     evm_another_account = accounts.add()
     evm_another_address = evm_another_account.address
+    authorizer = accounts.add()
     name = "NAME"
     symbol = "symbol"
     batch_nbr = 20230401
     espace_chain_id = web3.eth.chain_id
+    oracle_expiration = 1000 # should set to 30 * 24 * 60 * 60 * 2 in deployment env
 
     owner.transfer(evm_user, "1 ether")  # type: ignore
     owner.transfer(evm_another_address, "1 ether")  # type: ignore
@@ -62,7 +65,7 @@ def main():
     core_contract = cast(
         Contract,
         DualSpaceNFTCore.deploy(
-            name, symbol, cross_space_call.address, espace_chain_id, {"from": owner}
+            name, symbol, cross_space_call.address, espace_chain_id, oracle_expiration, {"from": owner} # set life to 1000 for tests
         ),
     )
     mapped_address = cast(
@@ -75,7 +78,7 @@ def main():
     core_contract.setEvmContractAddress(evm_contract.address, {"from": owner})
 
     # start batch
-    core_contract.startBatch(batch_nbr, oracle_signer, 1, {"from": owner})
+    core_contract.startBatch(batch_nbr, oracle_signer, authorizer, 1, {"from": owner})
 
     # print("should fail because permission is not granted")
     should_revert(
@@ -97,6 +100,7 @@ def main():
         core_contract,
         batch_nbr,
         oracle_signer,
+        authorizer,
         "hello_poap",
         1,
         user,
@@ -243,6 +247,7 @@ def main():
         core_contract,
         batch_nbr,
         oracle_signer,
+        authorizer,
         "hello_poap",
         1,
         user,
@@ -254,6 +259,7 @@ def main():
         core_contract,
         batch_nbr,
         oracle_signer,
+        authorizer,
         "hello_poap",
         1,
         None,
@@ -267,12 +273,29 @@ def main():
         core_contract,
         batch_nbr,
         oracle_signer,
+        authorizer,
         "hello_poap",
         1,
         None,
         None,
         random_sender,
     )
+
+    should_revert(
+        "mint setting not expired for enough time",
+        core_contract.clearMintSetting.call,
+        batch_nbr,
+        {"from": random_sender},
+    )
+    chain.mine(oracle_expiration)
+    should_revert(
+        "mint setting not expired for enough time",
+        core_contract.clearMintSetting.call,
+        batch_nbr,
+        {"from": random_sender},
+    )
+    chain.mine(oracle_expiration)
+    core_contract.clearMintSetting(batch_nbr, {"from": random_sender})
 
 
 class MetatransactionConstructor:
@@ -321,6 +344,7 @@ def mint_to(
     core_contract: Contract,
     batch_nbr: int,
     oracle_signer: LocalAccount,
+    authorizer: LocalAccount,
     username: str,
     rarity: int,
     core_owner: Union[_PrivateKeyAccount, None],
@@ -328,7 +352,7 @@ def mint_to(
     random_sender: _PrivateKeyAccount,
 ) -> int:
     core_contract.batchAuthorizeMintPermission(
-        batch_nbr, [username], [rarity], {"from": oracle_signer}
+        batch_nbr, [username], [rarity], {"from": authorizer}
     )
 
     core_address = core_owner.address if core_owner else "0x0000000000000000000000000000000000000000"
