@@ -61,7 +61,8 @@ def core_contract(deployed: bool, c_w3: CWeb3, e_w3: Web3) -> ConfluxContract:
             os.environ["NAME"],
             os.environ["SYMBOL"],
             c_w3.cfx.contract(name="CrossSpaceCall").address,
-            e_w3.eth.chain_id
+            e_w3.eth.chain_id,
+            30 * 24 * 60 * 60 * 2 # 30 days * 2 blocks / second
         )
         deploy_hash = constructor.transact()
         receipt = c_w3.cfx.wait_for_transaction_receipt(deploy_hash)
@@ -76,7 +77,7 @@ def core_contract(deployed: bool, c_w3: CWeb3, e_w3: Web3) -> ConfluxContract:
 def evm_contract(deployed: bool, e_w3: Web3, core_contract: ConfluxContract) -> Contract:
     abi, bytecode = get_metadata("build/contracts/DualSpaceNFTEVM.json")
     if deployed:
-        address = cast(ChecksumAddress, os.environ["EVM_CONTRACT_ADDRESS"])
+        address = Web3.to_checksum_address(os.environ["EVM_CONTRACT_ADDRESS"])
     else:
         construct_c = e_w3.eth.contract(bytecode=bytecode, abi=abi)
         mappingAddress = core_contract.address.mapped_evm_space_address
@@ -101,6 +102,7 @@ def evm_contract(deployed: bool, e_w3: Web3, core_contract: ConfluxContract) -> 
 class BatchSetting:
     batch_nbr: int
     signer: CfxLocalAccount
+    authorizer: CfxLocalAccount
 
 @pytest.fixture(scope="session")
 def batch_setting(
@@ -108,14 +110,17 @@ def batch_setting(
 ) -> BatchSetting:
     batch_nbr = random.randint(20000000, 21000000)
     signer = cw3_accounts[1]
+    authorizer = cw3_accounts[3]
+    # use signer as authorizer in testnet for simplicity
+    # will change 
     core_contract.functions.startBatch(
-        batch_nbr, signer.address, 1
+        batch_nbr, signer.address, authorizer.address, 1
     ).transact().executed()
-    return BatchSetting(batch_nbr, signer)
+    return BatchSetting(batch_nbr, signer, authorizer)
 
 
 @pytest.fixture(scope="session")
-def cw3_accounts(c_w3: CWeb3) -> Tuple[CfxLocalAccount, CfxLocalAccount, CfxLocalAccount]:
+def cw3_accounts(c_w3: CWeb3) -> Tuple[CfxLocalAccount, CfxLocalAccount, CfxLocalAccount, CfxLocalAccount]:
     '''
     returns util accounts [user_account, oracle_signer_account, random_account]
     '''
@@ -123,19 +128,23 @@ def cw3_accounts(c_w3: CWeb3) -> Tuple[CfxLocalAccount, CfxLocalAccount, CfxLoca
     user_account = c_w3.account.create()
     oracle_signer = c_w3.account.create()
     random_account = c_w3.account.create()
+    authorizer = c_w3.account.create()
     c_w3.wallet.add_accounts([
-        user_account, oracle_signer, random_account
+        user_account, oracle_signer, random_account, authorizer
     ])
     faucet.functions.claimCfx().transact({
         "from": user_account.address
-    })
+    }).mined()
     faucet.functions.claimCfx().transact({
         "from": oracle_signer.address
-    })
+    }).mined()
     faucet.functions.claimCfx().transact({
         "from": random_account.address
+    }).mined()
+    faucet.functions.claimCfx().transact({
+        "from": authorizer.address
     }).executed()
-    return user_account, oracle_signer, random_account
+    return user_account, oracle_signer, random_account, authorizer
 
 @pytest.fixture(scope="session")
 def oracle_signer(cw3_accounts: Tuple[CfxLocalAccount, CfxLocalAccount, CfxLocalAccount]) -> CfxLocalAccount:

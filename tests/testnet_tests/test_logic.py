@@ -1,6 +1,7 @@
 from conflux_web3 import Web3 as CWeb3  # do hook
 
 import os, pytest, json
+from hexbytes import HexBytes
 from typing import cast, Tuple, List
 from dataclasses import dataclass
 from dotenv import load_dotenv
@@ -47,7 +48,7 @@ def authorized_usernames(
         batch_setting.batch_nbr,
         [mint_permissions[1].username],
         [mint_permissions[1].rarity],
-    ).transact({"from": batch_setting.signer.address}).executed()
+    ).transact({"from": batch_setting.authorizer.address}).executed()
     return [x.username for x in mint_permissions]
 
 
@@ -98,15 +99,15 @@ def test_mint(
         batch_setting.batch_nbr,
         username,
         core_user_address,
-        core_user_address.hex_address,
-        [ signature.v, hex(signature.r), hex(signature.s) ], # signature
+        HexBytes(core_user_address.hex_address),
+        [ signature.v, HexBytes(signature.r), HexBytes(signature.s)], # signature
     ).call())
     receipt = core_contract.functions.mint(
         batch_setting.batch_nbr,
         username,
         core_user_address,
-        core_user_address.hex_address,
-        [ signature.v, hex(signature.r), hex(signature.s) ], # signature
+        HexBytes(core_user_address.hex_address),
+        [ signature.v, HexBytes(signature.r), HexBytes(signature.s) ], # signature
     ).transact().executed()
     token_owner = core_contract.functions.ownerOf(token_id).call()
     assert token_owner == core_user_address
