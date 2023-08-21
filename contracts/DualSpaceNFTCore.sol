@@ -63,6 +63,20 @@ contract DualSpaceNFTCore is
         _defaultOracleBlockLife = defaultOracleLife; // expected to defaults to 30 days, 2 block per second (30 * 24 * 60 * 60 * 2)
     }
 
+    function _authorizeUpgrade(address newImplementation) internal override {
+        _checkOwner();
+    }
+
+    function upgradeEvmContractTo(bytes20 newImplementation) onlyOwner public {
+        _crossSpaceCall.callEVM(
+            _evmContractAddress,
+            abi.encodeWithSignature(
+                "upgradeTo(address)",
+                newImplementation
+            )
+        );
+    }
+
     // function setEvmContractAddress(
     //     bytes20 evmContractAddress_
     // ) public onlyOwner {

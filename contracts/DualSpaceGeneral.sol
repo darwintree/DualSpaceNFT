@@ -4,8 +4,9 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts/utils/StringsUpgradeable.sol";
+import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
-abstract contract DualSpaceGeneral is ERC721Upgradeable {
+abstract contract DualSpaceGeneral is ERC721Upgradeable, UUPSUpgradeable {
 
     event BatchStart(uint256 startBlock, uint128 batchNbr, uint8 ratio);
 

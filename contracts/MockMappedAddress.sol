@@ -3,7 +3,7 @@ pragma solidity >=0.8.0;
 
 contract MockMappedAddress {
 
-    address coreAddress;
+    address public coreAddress;
 
     constructor(address _coreAddress) {
         // set origin

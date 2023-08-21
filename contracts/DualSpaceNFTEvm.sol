@@ -36,6 +36,13 @@ contract DualSpaceNFTEvm is DualSpaceGeneral {
         _baseExpirationBlockInterval = 30 days * 2; // 2 block per second
     }
 
+    function _authorizeUpgrade(address newImplementation) internal override {
+        require(
+            msg.sender == _coreContractMappingAddress,
+            "only core contract could manipulate this function"
+        );
+    }
+
     modifier fromCore() {
         require(
             msg.sender == _coreContractMappingAddress,

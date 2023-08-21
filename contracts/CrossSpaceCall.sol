@@ -6,7 +6,7 @@ import "./MockMappedAddress.sol";
 
 contract MockCrossSpaceCall {
 
-    mapping(address=>bytes20) core2e;
+    mapping(address=>bytes20) public core2e;
     // mapping(bytes20=>address) e2core;
 
     function transferEVM(bytes20 to) external payable returns (bytes memory output) {

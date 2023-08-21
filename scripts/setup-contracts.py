@@ -3,6 +3,7 @@ from brownie import (
     DualSpaceNFTCore,  # type:ignore
     DualSpaceNFTEvm,  # type:ignore
     MockMappedAddress,  # type:ignore
+    DeploymentProxy, # type: ignore
     accounts as untyped_accounts,
     web3,
     chain,
@@ -62,18 +63,27 @@ def main():
 
     # setup
     cross_space_call = cast(Contract, MockCrossSpaceCall.deploy({"from": owner}))
-    core_contract = cast(
+    core_contract_impl = cast(
         Contract,
         DualSpaceNFTCore.deploy({"from": owner}),
     )
+    core_contract_proxy = cast(Contract, DeploymentProxy.deploy(core_contract_impl.address, bytes(0), {"from": owner}))
+    addr = core_contract_proxy.address
+    DeploymentProxy.remove(DeploymentProxy[-1])
+    core_contract = DualSpaceNFTCore.at(core_contract_proxy.address)
 
     mapped_address = cast(
         Contract, MockMappedAddress.deploy(core_contract.address, {"from": owner})
     ).address
     cross_space_call.setMockMapped(core_contract.address, mapped_address)
-    evm_contract = cast(
+    evm_contract_impl = cast(
         Contract, DualSpaceNFTEvm.deploy({"from": owner})
     )
+    evm_contract_proxy = cast(Contract, DeploymentProxy.deploy(evm_contract_impl.address, bytes(0), {"from": owner}))
+    addr = evm_contract_proxy.address
+    DeploymentProxy.remove(DeploymentProxy[-1])
+    evm_contract = cast(Contract, DualSpaceNFTEvm.at(addr))
+
     evm_contract.initialize(name, symbol, mapped_address, {"from": owner})
     core_contract.initialize(
         name, symbol, evm_contract.address, cross_space_call.address, espace_chain_id, oracle_expiration, {"from": owner} # set life to 1000 for tests
