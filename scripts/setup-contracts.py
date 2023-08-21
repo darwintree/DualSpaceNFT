@@ -88,7 +88,30 @@ def main():
     core_contract.initialize(
         name, symbol, evm_contract.address, cross_space_call.address, espace_chain_id, oracle_expiration, {"from": owner} # set life to 1000 for tests
     )
-    # core_contract.setEvmContractAddress(evm_contract.address, {"from": owner})
+    
+    # test upgrade
+    new_core_implementation = DualSpaceNFTCore.deploy({"from": owner})
+    new_evm_implementation = DualSpaceNFTEvm.deploy({"from": owner})
+    core_contract.upgradeTo(new_core_implementation.address, {"from": owner})
+    should_revert(
+        "caller is not the owner",
+        core_contract.upgradeTo.call,
+        new_core_implementation.address,
+        {"from": oracle_signer}
+    )
+    core_contract.upgradeEvmContractTo(new_evm_implementation.address, {"from": owner})
+    should_revert(
+        "caller is not the owner",
+        core_contract.upgradeEvmContractTo.call,
+        new_evm_implementation.address,
+        {"from": oracle_signer}
+    )
+    should_revert(
+        "only core contract could manipulate this function",
+        evm_contract.upgradeTo.call,
+        new_core_implementation.address,
+        {"from": oracle_signer}
+    )
 
     # start batch
     core_contract.startBatch(batch_nbr, oracle_signer, authorizer, 1, {"from": owner})

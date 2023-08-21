@@ -63,8 +63,7 @@ contract DualSpaceNFTCore is
         _defaultOracleBlockLife = defaultOracleLife; // expected to defaults to 30 days, 2 block per second (30 * 24 * 60 * 60 * 2)
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override {
-        _checkOwner();
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner() {
     }
 
     function upgradeEvmContractTo(bytes20 newImplementation) onlyOwner public {
@@ -72,7 +71,7 @@ contract DualSpaceNFTCore is
             _evmContractAddress,
             abi.encodeWithSignature(
                 "upgradeTo(address)",
-                newImplementation
+                address(newImplementation)
             )
         );
     }
