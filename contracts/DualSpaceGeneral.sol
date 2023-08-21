@@ -2,10 +2,10 @@
 
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721Upgradeable.sol";
+import "@openzeppelin/contracts/utils/StringsUpgradeable.sol";
 
-abstract contract DualSpaceGeneral is ERC721 {
+abstract contract DualSpaceGeneral is ERC721Upgradeable {
 
     event BatchStart(uint256 startBlock, uint128 batchNbr, uint8 ratio);
 
@@ -42,7 +42,7 @@ abstract contract DualSpaceGeneral is ERC721 {
 
         string memory baseURI = _baseURI();
         // same batch nbr and same rarity has same metadata
-        return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, Strings.toString(tokenId/10**4))) : "";
+        return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, StringsUpgradeable.toString(tokenId/10**4))) : "";
     }
 
     // should add?

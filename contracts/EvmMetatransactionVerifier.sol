@@ -2,15 +2,15 @@
 
 pragma solidity ^0.8.0;
 import "./EIP712.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+// import "@openzeppelin/contracts/utils/cryptography/ECDSAUpgradeable.sol";
 
 abstract contract EvmMetatransactionVerifier is EIP712 {
 
     // avoid meta transaction replay attack
     mapping (bytes20=>uint256) _metaTransactionNonces;
 
-    constructor(string memory name, string memory version, uint256 eSpaceChainId) EIP712(name, version, eSpaceChainId) {
-
+    function __EvmMetatransactionVerifier_init(string memory name, string memory version, uint256 eSpaceChainId) internal onlyInitializing{
+        __EIP712_init(name, version, eSpaceChainId);
     }
 
     function getMetatransactionNonce(bytes20 evmAddress) public view returns (uint256) {
@@ -31,7 +31,7 @@ abstract contract EvmMetatransactionVerifier is EIP712 {
                 )
             )
         );
-        address firstHexReplacedEvmSigner = ECDSA.recover(digest, signature);
+        address firstHexReplacedEvmSigner = ECDSAUpgradeable.recover(digest, signature);
 
         require(isOverwhelminglySameAddress(firstHexReplacedEvmSigner, evmSigner), "signature does not match evmSigner");
         _metaTransactionNonces[evmSigner] += 1;

@@ -3,9 +3,9 @@
 pragma solidity ^0.8.0;
 
 // import "@openzepplin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+// import "@openzeppelin/contracts/token/ERC721/ERC721Upgradeable.sol";
 // import "OpenZeppelin/openzeppelin-contracts@4.9.0/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/OwnableUpgradeable.sol";
 import "./EvmMetatransactionVerifier.sol";
 import "./DualSpaceGeneral.sol";
 import "./DualSpaceNFTEvm.sol";
@@ -17,7 +17,7 @@ import "../interfaces/ICrossSpaceCall.sol";
 // finally bind from core (bind from core->espace)
 contract DualSpaceNFTCore is
     DualSpaceGeneral,
-    Ownable,
+    OwnableUpgradeable,
     EvmMetatransactionVerifier
 {
     bytes20 _evmContractAddress;
@@ -46,28 +46,33 @@ contract DualSpaceNFTCore is
 
     mapping(uint128 => uint16) _batchInternalIdCounter;
 
-    constructor(
+    function initialize(
         string memory name_,
         string memory symbol_,
+        bytes20 evmContractAddress_,
         address crossSpaceCallAddress,
         uint256 eSpaceChainId,
         uint256 defaultOracleLife
-    ) ERC721(name_, symbol_) EvmMetatransactionVerifier(name_, "v1", eSpaceChainId) Ownable() {
+    ) public initializer {
+        __ERC721_init(name_, symbol_);
+        __EvmMetatransactionVerifier_init(name_, "v1", eSpaceChainId);
+        __Ownable_init();
+        _evmContractAddress = evmContractAddress_;
         // _crossSpaceCall = CrossSpaceCall(0x0888000000000000000000000000000000000006);
         _crossSpaceCall = CrossSpaceCall(crossSpaceCallAddress);
         _defaultOracleBlockLife = defaultOracleLife; // expected to defaults to 30 days, 2 block per second (30 * 24 * 60 * 60 * 2)
     }
 
-    function setEvmContractAddress(
-        bytes20 evmContractAddress_
-    ) public onlyOwner {
-        require(
-            _evmContractAddress == bytes20(0),
-            "setEvmContractAddress should only be invoked once"
-        );
-        _evmContractAddress = evmContractAddress_;
-        // evmContractForDebug = DualSpaceNFTEvm(address(evmContractAddress_));
-    }
+    // function setEvmContractAddress(
+    //     bytes20 evmContractAddress_
+    // ) public onlyOwner {
+    //     require(
+    //         _evmContractAddress == bytes20(0),
+    //         "setEvmContractAddress should only be invoked once"
+    //     );
+    //     _evmContractAddress = evmContractAddress_;
+    //     // evmContractForDebug = DualSpaceNFTEvm(address(evmContractAddress_));
+    // }
 
     function startBatch(
         uint128 batchNbr,

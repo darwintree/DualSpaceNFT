@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 // import "@openzepplin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+// import "@openzeppelin/contracts/token/ERC721/ERC721Upgradeable.sol";
 import "./DualSpaceGeneral.sol";
 
 // deployment
@@ -26,11 +26,12 @@ contract DualSpaceNFTEvm is DualSpaceGeneral {
     uint _baseExpirationBlockInterval;
 
     // name_ and symbol_ should be same as core side
-    constructor(
+    function initialize(
         string memory name_,
         string memory symbol_,
         address _coreContractMappingAddress_
-    ) ERC721(name_, symbol_) {
+    ) initializer public {
+        __ERC721_init(name_, symbol_);
         _coreContractMappingAddress = _coreContractMappingAddress_;
         _baseExpirationBlockInterval = 30 days * 2; // 2 block per second
     }

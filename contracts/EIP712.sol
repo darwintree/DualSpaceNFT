@@ -3,10 +3,11 @@
 // OpenZeppelin Contracts (last updated v4.9.0) (utils/cryptography/EIP712.sol)
 // SHortStrings are removed
 
-pragma solidity ^0.8.8;
+pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/interfaces/IERC5267.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSAUpgradeable.sol";
+import "@openzeppelin/contracts/interfaces/IERC5267Upgradeable.sol";
+import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 /**
  * @dev https://eips.ethereum.org/EIPS/eip-712[EIP 712] is a standard for hashing and signing of typed structured data.
@@ -33,19 +34,19 @@ import "@openzeppelin/contracts/interfaces/IERC5267.sol";
  *
  * @custom:oz-upgrades-unsafe-allow state-variable-immutable state-variable-assignment
  */
-abstract contract EIP712 is IERC5267 {
+abstract contract EIP712 is IERC5267Upgradeable, Initializable {
 
     bytes32 private constant _TYPE_HASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
     // Cache the domain separator as an immutable value, but also store the chain id that it corresponds to, in order to
     // invalidate the cached domain separator if the chain id changes.
-    bytes32 private immutable _cachedDomainSeparator;
-    uint256 private immutable _cachedChainId;
-    address private immutable _cachedThis;
+    bytes32 private _cachedDomainSeparator;
+    uint256 private _cachedChainId;
+    address private _cachedThis;
 
-    bytes32 private immutable _hashedName;
-    bytes32 private immutable _hashedVersion;
+    bytes32 private _hashedName;
+    bytes32 private _hashedVersion;
 
     string _name;
     string _version;
@@ -64,7 +65,7 @@ abstract contract EIP712 is IERC5267 {
      * NOTE: These parameters cannot be changed except through a xref:learn::upgrading-smart-contracts.adoc[smart
      * contract upgrade].
      */
-    constructor(string memory name, string memory version, uint256 eSpaceChainId) {
+    function __EIP712_init(string memory name, string memory version, uint256 eSpaceChainId) internal onlyInitializing {
         _name = name;
         _version = version;
         _hashedName = keccak256(bytes(name));
@@ -108,7 +109,7 @@ abstract contract EIP712 is IERC5267 {
      * ```
      */
     function _hashTypedDataV4(bytes32 structHash) internal view virtual returns (bytes32) {
-        return ECDSA.toTypedDataHash(_domainSeparatorV4(), structHash);
+        return ECDSAUpgradeable.toTypedDataHash(_domainSeparatorV4(), structHash);
     }
 
     /**

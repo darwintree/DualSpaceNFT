@@ -64,18 +64,21 @@ def main():
     cross_space_call = cast(Contract, MockCrossSpaceCall.deploy({"from": owner}))
     core_contract = cast(
         Contract,
-        DualSpaceNFTCore.deploy(
-            name, symbol, cross_space_call.address, espace_chain_id, oracle_expiration, {"from": owner} # set life to 1000 for tests
-        ),
+        DualSpaceNFTCore.deploy({"from": owner}),
     )
+
     mapped_address = cast(
         Contract, MockMappedAddress.deploy(core_contract.address, {"from": owner})
     ).address
     cross_space_call.setMockMapped(core_contract.address, mapped_address)
     evm_contract = cast(
-        Contract, DualSpaceNFTEvm.deploy(name, symbol, mapped_address, {"from": owner})
+        Contract, DualSpaceNFTEvm.deploy({"from": owner})
     )
-    core_contract.setEvmContractAddress(evm_contract.address, {"from": owner})
+    evm_contract.initialize(name, symbol, mapped_address, {"from": owner})
+    core_contract.initialize(
+        name, symbol, evm_contract.address, cross_space_call.address, espace_chain_id, oracle_expiration, {"from": owner} # set life to 1000 for tests
+    )
+    # core_contract.setEvmContractAddress(evm_contract.address, {"from": owner})
 
     # start batch
     core_contract.startBatch(batch_nbr, oracle_signer, authorizer, 1, {"from": owner})

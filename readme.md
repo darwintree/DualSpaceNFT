@@ -2,7 +2,8 @@
 
 ```bash
 pip install eth-brownie
-brownie pm install OpenZeppelin/openzeppelin-contracts@4.9.0
+# brownie pm install OpenZeppelin/openzeppelin-contracts@4.9.3
+brownie pm install OpenZeppelin/openzeppelin-contracts-upgradeable@4.9.3
 ```
 
 ## run test script
