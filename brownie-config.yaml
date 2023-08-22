@@ -1,5 +1,5 @@
 compiler:
   solc:
     remappings:
-      - "@openzeppelin=OpenZeppelin/openzeppelin-contracts-upgradeable@4.9.3"
+      - "@openzeppelin/contracts=OpenZeppelin/openzeppelin-contracts-upgradeable@4.9.3"
       - "@ozori=OpenZeppelin/openzeppelin-contracts@4.9.0"
