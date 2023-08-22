@@ -34,10 +34,6 @@ abstract contract DualSpaceGeneral is ERC721Upgradeable, UUPSUpgradeable {
         return block.number > getPrivilegeExpiration(tokenId);
     }
 
-    function _baseURI() internal view override returns (string memory) {
-        return "https://raw.githubusercontent.com/darwintree/dual-space-nft-token-uri-test/main/";
-    }
-
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
         _requireMinted(tokenId);
 

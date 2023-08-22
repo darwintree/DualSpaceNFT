@@ -317,6 +317,9 @@ def main():
         random_sender,
     )
 
+    core_contract.setBaseURI("https://baidu.com/", { "from": owner })
+    assert core_contract.tokenURI(token_id) == evm_contract.tokenURI(token_id)
+
     should_revert(
         "mint setting not expired for enough time",
         core_contract.clearMintSetting.call,

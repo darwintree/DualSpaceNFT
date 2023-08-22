@@ -63,6 +63,23 @@ contract DualSpaceNFTCore is
         _defaultOracleBlockLife = defaultOracleLife; // expected to defaults to 30 days, 2 block per second (30 * 24 * 60 * 60 * 2)
     }
 
+    string public baseURI;
+
+    function _baseURI() internal view override returns (string memory) {
+        return baseURI;
+    }
+
+    function setBaseURI(string memory baseURI_) external onlyOwner {
+        baseURI = baseURI_;
+        _crossSpaceCall.callEVM(
+            _evmContractAddress,
+            abi.encodeWithSignature(
+                "setBaseURI(string)",
+                baseURI_
+            )
+        );
+    }
+
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner() {
     }
 

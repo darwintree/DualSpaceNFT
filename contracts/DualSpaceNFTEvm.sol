@@ -53,6 +53,16 @@ contract DualSpaceNFTEvm is DualSpaceGeneral {
         _mint(address(ownerEvmAddress), tokenId);
     }
 
+    string public baseURI = "";
+
+    function _baseURI() internal view override returns (string memory) {
+        return baseURI;
+    }
+
+    function setBaseURI(string memory baseURI_) external fromCore {
+        baseURI = baseURI_;
+    }
+
     function resolveTokenId(
         uint256 tokenId
     ) public view returns (TokenMeta memory) {
