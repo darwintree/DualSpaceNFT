@@ -93,16 +93,13 @@ contract DualSpaceNFTCore is
         );
     }
 
-    // function setEvmContractAddress(
-    //     bytes20 evmContractAddress_
-    // ) public onlyOwner {
-    //     require(
-    //         _evmContractAddress == bytes20(0),
-    //         "setEvmContractAddress should only be invoked once"
-    //     );
-    //     _evmContractAddress = evmContractAddress_;
-    //     // evmContractForDebug = DualSpaceNFTEvm(address(evmContractAddress_));
-    // }
+    function checkMintPermission(
+        uint128 batchNbr,
+        string memory username
+    ) external view returns (uint8) {
+        bytes32 usernameHash = keccak256(abi.encodePacked(username));
+        return _authorizedRarityMintPermission[batchNbr][usernameHash];
+    }
 
     function startBatch(
         uint128 batchNbr,
